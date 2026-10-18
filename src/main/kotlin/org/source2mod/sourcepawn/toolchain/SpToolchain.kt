@@ -38,6 +38,13 @@ class SpToolchain private constructor(
     /** The project directory as a host path (//wsl.localhost/... or C:/...). */
     val projectDir: String? get() = project.basePath ?: project.guessProjectDir()?.path
 
+    /** CMake / AMBuild build dirs with the spcomp commands in them (Settings | SourcePawn | Build system). */
+    val buildDirs: List<SpBuildDir> by lazy {
+        val dir = projectDir ?: return@lazy emptyList()
+        val explicit = settings.buildDirectory?.takeIf { it.isNotBlank() }?.let { target.toHost(userPathToTarget(it)) }
+        SpBuildSystemReader.find(settings.buildSystem, dir, explicit, target)
+    }
+
     val compiler: Resolved? by lazy { resolveCompiler() }
     val includeDirectories: List<Resolved> by lazy { resolveIncludes() }
     val languageServer: Resolved? by lazy { resolveServer() }
@@ -92,6 +99,11 @@ class SpToolchain private constructor(
             val p = userPathToTarget(it)
             return Resolved(p, "settings", target.exists(p))
         }
+        for (b in buildDirs) {
+            val c = b.commands.firstOrNull() ?: continue
+            val p = if (c.spcomp.contains('/') || c.spcomp.contains('\\')) c.spcomp else target.which(c.spcomp) ?: continue
+            return Resolved(p, buildSource(b), target.exists(p))
+        }
         env["SPCOMP"]?.takeIf { it.isNotBlank() }?.let {
             val p = userPathToTarget(it)
             return Resolved(p, "\$SPCOMP", target.exists(p))
@@ -120,6 +132,7 @@ class SpToolchain private constructor(
         val listed = overrides.includeDirectories ?: settings.includeDirectories
         val listedSource = if (overrides.includeDirectories != null) "run configuration" else "settings"
         for (raw in listed) if (raw.isNotBlank()) add(userPathToTarget(raw), listedSource)
+        for (b in buildDirs) for (c in b.commands) for (inc in c.includes) add(inc, buildSource(b))
 
         if (settings.useEnvironmentIncludes) {
             env["SOURCEPAWN_INCLUDE"]?.let { v ->
@@ -135,6 +148,21 @@ class SpToolchain private constructor(
             }
         }
         return out.values.toList()
+    }
+
+    private fun buildSource(b: SpBuildDir): String {
+        val rel = projectDir?.let { File(b.hostDir).relativeToOrNull(File(it))?.path?.replace('\\', '/') } ?: b.hostDir
+        return if (b.kind == BuildSystem.CMAKE) "CMake: $rel" else "AMBuild: $rel"
+    }
+
+    /** cmake on the target's PATH; locally on Windows, else the IDE's bundled one (CLion ships it). */
+    fun cmake(): String? {
+        target.which("cmake")?.let { return it }
+        if (target is SpTarget.Local && SystemInfo.isWindows) {
+            val bundled = File(PathManager.getHomePath(), "bin/cmake/win/x64/bin/cmake.exe")
+            if (bundled.isFile) return bundled.path
+        }
+        return null
     }
 
     private fun resolveServer(): Resolved? {

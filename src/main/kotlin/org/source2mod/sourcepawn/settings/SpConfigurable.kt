@@ -44,6 +44,18 @@ class SpConfigurable(private val project: Project) :
                     textField().bindText({ edit.wslDistro ?: "" }, { edit.wslDistro = it })
                         .comment("Empty = the distro of a \\\\wsl.localhost project, else the default distro")
                 }
+                row("Build system:") {
+                    comboBox(org.source2mod.sourcepawn.toolchain.BuildSystem.entries)
+                        .bindItem(edit::buildSystem.toNullableProperty())
+                        .comment("spcomp and include dirs from the spcomp commands of a CMake build dir (build.ninja / build.make) " +
+                            "or an AMBuild objdir; the fields below still come first")
+                }
+                row("Build directory:") {
+                    textFieldWithBrowseButton(FileChooserDescriptorFactory.createSingleFolderDescriptor().withTitle("Build Directory"), project)
+                        .align(AlignX.FILL)
+                        .bindText({ edit.buildDirectory ?: "" }, { edit.buildDirectory = it })
+                        .comment("Empty = every CMake build dir / AMBuild objdir up to two levels under the project")
+                }
                 row("spcomp:") {
                     textFieldWithBrowseButton(FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor().withTitle("spcomp"), project)
                         .bindText({ edit.compilerPath ?: "" }, { edit.compilerPath = it })
@@ -161,6 +173,16 @@ class SpConfigurable(private val project: Project) :
             val sb = StringBuilder("<html>")
             sb.append("<b>Runs on:</b> ${e(t.target.displayName)}<br>")
             t.projectDir?.let { sb.append("<b>Project dir:</b> <code>${e(it)}</code> → <code>${e(t.target.toTarget(it))}</code><br>") }
+            if (t.buildDirs.isNotEmpty()) {
+                sb.append("<b>Build dirs:</b><br>")
+                for (b in t.buildDirs) {
+                    sb.append("&nbsp;&nbsp;${b.kind.name} <code>${e(b.hostDir)}</code>: ${b.commands.size} spcomp command(s)")
+                    for (c in b.commands) sb.append("<br>&nbsp;&nbsp;&nbsp;&nbsp;<code>${e(c.source.substringAfterLast('/'))}</code> → <code>${e(c.output ?: "?")}</code>")
+                    sb.append("<br>")
+                }
+            } else if (t.settings.buildSystem != org.source2mod.sourcepawn.toolchain.BuildSystem.NONE) {
+                sb.append("<b>Build dirs:</b> none found (configure the CMake / AMBuild build once)<br>")
+            }
             sb.append(line("spcomp", t.compiler))
             sb.append(line("Language server", t.languageServer))
             sb.append("<b>Include directories:</b>")

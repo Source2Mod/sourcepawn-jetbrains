@@ -46,6 +46,11 @@ class SpRunOptions : LocatableRunConfigurationOptions() {
     var outputDir by string("")
     var extraArgs by string("")
 
+    /** Build through the project's CMake / AMBuild build dir instead of calling spcomp. */
+    var useBuildSystem by property(false)
+    /** cmake --build --target; empty = all. Unused for AMBuild (it builds the objdir). */
+    var cmakeTarget by string("")
+
     var compilerOverride by string("")
     var overrideIncludes by property(false)
     var includeOverrides by list<String>()
@@ -67,7 +72,9 @@ class SpRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
     override fun getConfigurationEditor() = SpRunConfigurationEditor(project)
 
     override fun checkConfiguration() {
-        if (options.useMainFile) {
+        if (options.useBuildSystem) {
+            // the script is optional here: without one the whole build counts, every .smx is copied
+        } else if (options.useMainFile) {
             if (org.source2mod.sourcepawn.settings.SpSettings.get(project).mainFile.isNullOrBlank())
                 throw RuntimeConfigurationError("No main file set in Settings | Languages & Frameworks | SourcePawn")
         } else if (options.scriptPath.isNullOrBlank()) {
@@ -101,6 +108,17 @@ class SpRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
             ?.let { toolchain.target.toHost(toolchain.userPathToTarget(it)) }
             ?: SpCompiler.defaultOutputDir(toolchain, script)
         return SpCompileRequest(script, out, ParametersListUtil.parse(toolchain.expand(options.extraArgs ?: "")))
+    }
+
+    /** What Build / Run executes: spcomp, or the build system when [SpRunOptions.useBuildSystem]. */
+    fun buildPlan(toolchain: SpToolchain): SpBuildPlan {
+        if (!options.useBuildSystem) return SpCompiler.plan(toolchain, compileRequest(toolchain))
+        val dir = toolchain.buildDirs.firstOrNull()
+            ?: throw ExecutionException("No CMake build dir or AMBuild objdir found " +
+                "(Settings | Languages & Frameworks | SourcePawn | Build system); configure the build once first")
+        val raw = if (options.useMainFile) toolchain.settings.mainFile else options.scriptPath
+        val script = raw?.takeIf { it.isNotBlank() }?.let { toolchain.target.toHost(toolchain.userPathToTarget(it)) }
+        return SpCompiler.buildSystemPlan(toolchain, dir, options.cmakeTarget, script)
     }
 
     fun rconPasswordAttributes() = rconAttributes(options.rconHost ?: "", options.rconPort)

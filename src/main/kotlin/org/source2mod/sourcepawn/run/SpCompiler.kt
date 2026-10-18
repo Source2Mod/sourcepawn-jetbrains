@@ -7,6 +7,8 @@ import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.openapi.util.Key
 import com.intellij.util.execution.ParametersListUtil
+import org.source2mod.sourcepawn.toolchain.BuildSystem
+import org.source2mod.sourcepawn.toolchain.SpBuildDir
 import org.source2mod.sourcepawn.toolchain.SpTarget
 import org.source2mod.sourcepawn.toolchain.SpToolchain
 import java.io.File
@@ -32,7 +34,20 @@ data class SpCompileRequest(
     val smx get() = File(outputDir, smxName).path
 }
 
-class SpCompileResult(val exitCode: Int, val messages: List<SpMessage>, val smx: String) {
+/** A ready-to-run build step: spcomp itself, or `cmake --build` / `ambuild`. Paths are host paths. */
+class SpBuildPlan(
+    val commandLine: GeneralCommandLine,
+    /** Where relative paths in spcomp's messages are resolved. */
+    val workDir: String?,
+    /** The .smx files this step produces. */
+    val outputs: List<String>,
+    val title: String,
+    /** Directories to create first. */
+    val makeDirs: List<String> = emptyList(),
+)
+
+class SpCompileResult(val exitCode: Int, val messages: List<SpMessage>, val outputs: List<String>) {
+    val smx: String get() = outputs.firstOrNull() ?: ""
     val success get() = exitCode == 0 && messages.none { it.severity == SpMessage.Severity.ERROR }
 }
 
@@ -76,18 +91,31 @@ object SpCompiler {
         return target.commandLine(compiler.path, args, scriptDir)
     }
 
+    fun plan(toolchain: SpToolchain, req: SpCompileRequest) = SpBuildPlan(
+        commandLine(toolchain, req), File(req.script).parent, listOf(req.smx),
+        "spcomp ${File(req.script).name}", listOf(req.outputDir),
+    )
+
     /** Runs spcomp, passing every output line to [onLine]; blocks until it exits. */
     fun compile(
         toolchain: SpToolchain,
         req: SpCompileRequest,
         onStart: (GeneralCommandLine, OSProcessHandler) -> Unit = { _, _ -> },
         onLine: (String, Key<*>) -> Unit,
+    ): SpCompileResult = run(toolchain, plan(toolchain, req), onStart, onLine)
+
+    /** Runs a plan; spcomp's messages are collected from its output whatever runs it. */
+    fun run(
+        toolchain: SpToolchain,
+        plan: SpBuildPlan,
+        onStart: (GeneralCommandLine, OSProcessHandler) -> Unit = { _, _ -> },
+        onLine: (String, Key<*>) -> Unit,
     ): SpCompileResult {
-        File(req.outputDir).mkdirs()
-        val cmd = commandLine(toolchain, req)
+        plan.makeDirs.forEach { File(it).mkdirs() }
+        val cmd = plan.commandLine
         val messages = mutableListOf<SpMessage>()
         val handler = OSProcessHandler(cmd)
-        val workDir = File(req.script).parent
+        val workDir = plan.workDir
         val pending = StringBuilder()
         handler.addProcessListener(object : ProcessAdapter() {
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
@@ -110,7 +138,35 @@ object SpCompiler {
             parse(pending.toString(), toolchain.target, workDir)?.let { messages += it }
             onLine(pending.toString() + "\n", com.intellij.execution.process.ProcessOutputTypes.STDOUT)
         }
-        return SpCompileResult(handler.exitCode ?: -1, messages, req.smx)
+        return SpCompileResult(handler.exitCode ?: -1, messages.distinct(), plan.outputs)
+    }
+
+    /**
+     * Build through the project's build system: `cmake --build <dir> [--target t]`
+     * or `ambuild <objdir>`. [script] (host path) narrows the outputs to its .smx.
+     */
+    fun buildSystemPlan(toolchain: SpToolchain, dir: SpBuildDir, cmakeTarget: String?, script: String?): SpBuildPlan {
+        val target = toolchain.target
+        val tDir = target.toTarget(dir.hostDir)
+        val cmd = when (dir.kind) {
+            BuildSystem.CMAKE -> {
+                val cmake = toolchain.cmake() ?: throw ExecutionException("cmake not found on the PATH (${target.displayName})")
+                val args = mutableListOf("--build", tDir)
+                if (!cmakeTarget.isNullOrBlank()) args += listOf("--target", cmakeTarget)
+                target.commandLine(cmake, args, dir.hostDir)
+            }
+            BuildSystem.AMBUILD -> {
+                val ambuild = target.which("ambuild") ?: throw ExecutionException("ambuild not found on the PATH (${target.displayName})")
+                target.commandLine(ambuild, listOf(tDir), dir.hostDir)
+            }
+            else -> throw ExecutionException("no build system")
+        }
+        val tScript = script?.let { target.toTarget(it) }
+        val outputs = dir.commands
+            .filter { tScript == null || it.source == tScript }
+            .mapNotNull { it.output?.let(target::toHost) }
+        val what = if (dir.kind == BuildSystem.CMAKE) "cmake --build" else "ambuild"
+        return SpBuildPlan(cmd, dir.hostDir, outputs, "$what ${File(dir.hostDir).name}")
     }
 
     fun describe(cmd: GeneralCommandLine) = ParametersListUtil.join(cmd.getCommandLineList(null))

@@ -26,6 +26,8 @@ class SpRunConfigurationEditor(private val project: Project) : SettingsEditor<Sp
         addBrowseFolderListener(project, FileChooserDescriptorFactory.createSingleFolderDescriptor().withTitle("Output Directory"))
     }
     private val extraArgs = JBTextField()
+    private val useBuildSystem = JBCheckBox("Build with the project's CMake / AMBuild build instead of calling spcomp")
+    private val cmakeTarget = JBTextField(20)
     private val compiler = TextFieldWithBrowseButton().apply {
         addBrowseFolderListener(project, FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor().withTitle("spcomp"))
     }
@@ -55,6 +57,13 @@ class SpRunConfigurationEditor(private val project: Project) : SettingsEditor<Sp
                     .comment("Empty = project setting, else <script dir>/../plugins for a 'scripting' dir, else next to the script")
             }
             row("Extra spcomp arguments:") { cell(extraArgs).align(AlignX.FILL) }
+            row { cell(useBuildSystem) }
+            indent {
+                row("CMake target:") {
+                    cell(cmakeTarget).comment("Empty = all; AMBuild always builds its whole objdir. " +
+                        "The build dir comes from Settings | SourcePawn | Build system; the script only picks which .smx to copy.")
+                }
+            }.enabledIf(ButtonSelected(useBuildSystem))
             row("spcomp override:") { cell(compiler).align(AlignX.FILL).comment("Empty = the project's spcomp") }
             row { cell(overrideIncludes) }
             row { cell(includes).align(AlignX.FILL).comment("One per line; \$VAR\$ / \${VAR} / project-relative") }
@@ -77,6 +86,8 @@ class SpRunConfigurationEditor(private val project: Project) : SettingsEditor<Sp
         useFile.isSelected = !o.useMainFile
         script.text = o.scriptPath ?: ""
         outputDir.text = o.outputDir ?: ""
+        useBuildSystem.isSelected = o.useBuildSystem
+        cmakeTarget.text = o.cmakeTarget ?: ""
         extraArgs.text = o.extraArgs ?: ""
         compiler.text = o.compilerOverride ?: ""
         overrideIncludes.isSelected = o.overrideIncludes
@@ -95,6 +106,8 @@ class SpRunConfigurationEditor(private val project: Project) : SettingsEditor<Sp
         o.useMainFile = useMain.isSelected
         o.scriptPath = script.text.trim()
         o.outputDir = outputDir.text.trim()
+        o.useBuildSystem = useBuildSystem.isSelected
+        o.cmakeTarget = cmakeTarget.text.trim()
         o.extraArgs = extraArgs.text.trim()
         o.compilerOverride = compiler.text.trim()
         o.overrideIncludes = overrideIncludes.isSelected

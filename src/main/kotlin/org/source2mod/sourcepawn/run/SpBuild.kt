@@ -37,7 +37,7 @@ import java.io.File
 
 /** Compiles with the output in the Build tool window (clickable messages, error tree). */
 object SpBuild {
-    fun compileInBuildView(project: Project, title: String, prepare: () -> Pair<SpToolchain, SpCompileRequest>, done: (Boolean) -> Unit = {}) {
+    fun compileInBuildView(project: Project, title: String, prepare: () -> Pair<SpToolchain, SpBuildPlan>, done: (Boolean) -> Unit = {}) {
         // ProjectTaskRunner.run comes on a pooled thread; saving needs the EDT
         val app = com.intellij.openapi.application.ApplicationManager.getApplication()
         if (app.isDispatchThread) FileDocumentManager.getInstance().saveAllDocuments()
@@ -49,13 +49,13 @@ object SpBuild {
                 val start = System.currentTimeMillis()
                 var ok = false
                 try {
-                    val (toolchain, req) = prepare()
-                    val descriptor = DefaultBuildDescriptor(id, "SourcePawn: ${File(req.script).name}", File(req.script).parent, start)
+                    val (toolchain, plan) = prepare()
+                    val descriptor = DefaultBuildDescriptor(id, "SourcePawn: ${plan.title}", plan.workDir ?: project.basePath ?: ".", start)
                         .withExecutionFilter(SpOutputFilter(project))
-                    view.onEvent(id, StartBuildEventImpl(descriptor, "Compiling ${File(req.script).name}"))
+                    view.onEvent(id, StartBuildEventImpl(descriptor, plan.title))
                     showBuildWindow(project)
-                    val result = SpCompiler.compile(
-                        toolchain, req,
+                    val result = SpCompiler.run(
+                        toolchain, plan,
                         onStart = { cmd, _ -> view.onEvent(id, OutputBuildEventImpl(id, SpCompiler.describe(cmd) + "\n", true)) },
                         onLine = { line, type -> view.onEvent(id, OutputBuildEventImpl(id, line, type != ProcessOutputTypes.STDERR)) },
                     )
@@ -64,11 +64,11 @@ object SpBuild {
                         view.onEvent(id, FileMessageEventImpl(id, kind, "spcomp", "${m.code}: ${m.text}", null,
                             FilePosition(File(m.hostFile), m.line - 1, 0)))
                     }
-                    SpCompileResults.get(project).publish(req.script, result)
-                    LocalFileSystem.getInstance().refreshAndFindFileByPath(req.outputDir)?.refresh(true, false)
+                    SpCompileResults.get(project).publish(plan.title, result)
+                    for (out in result.outputs) LocalFileSystem.getInstance().refreshAndFindFileByPath(File(out).parent)?.refresh(true, false)
                     ok = result.success
                     view.onEvent(id, FinishBuildEventImpl(id, null, System.currentTimeMillis(),
-                        if (ok) "Compiled ${result.smx}" else "spcomp failed",
+                        if (!ok) "${plan.title} failed" else if (result.outputs.isEmpty()) "Built" else "Built ${result.outputs.joinToString(", ")}",
                         if (ok) SuccessResultImpl() else FailureResultImpl()))
                 } catch (e: Exception) {
                     val descriptor = DefaultBuildDescriptor(id, "SourcePawn", project.basePath ?: ".", start)
@@ -93,7 +93,7 @@ object SpBuild {
     fun compileConfiguration(project: Project, config: SpRunConfiguration, done: (Boolean) -> Unit = {}) =
         compileInBuildView(project, "Compiling ${config.name}", {
             val t = config.toolchain()
-            t to config.compileRequest(t)
+            t to config.buildPlan(t)
         }, done)
 
     fun selectedConfiguration(project: Project): SpRunConfiguration? =
@@ -150,7 +150,7 @@ class SpCompileFileAction : AnAction("Compile SourcePawn File", "Compile this fi
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
         SpBuild.compileInBuildView(project, "Compiling ${file.name}", {
             val t = SpToolchain.of(project)
-            t to SpCompileRequest(file.path, SpCompiler.defaultOutputDir(t, file.path))
+            t to SpCompiler.plan(t, SpCompileRequest(file.path, SpCompiler.defaultOutputDir(t, file.path)))
         })
     }
 }

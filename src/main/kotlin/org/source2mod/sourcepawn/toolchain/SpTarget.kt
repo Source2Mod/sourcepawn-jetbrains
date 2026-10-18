@@ -33,7 +33,7 @@ sealed class SpTarget {
     abstract fun which(name: String): String?
 
     /** Does the target path exist (checked through the host path)? */
-    fun exists(targetPath: String) = File(toHost(targetPath)).exists()
+    open fun exists(targetPath: String) = File(toHost(targetPath)).exists()
 
     object Local : SpTarget() {
         override val displayName = "local"
@@ -70,15 +70,34 @@ sealed class SpTarget {
 
         override fun env(): Map<String, String> = ENV_CACHE.getOrPut(distro) { loadEnv() }
 
-        override fun which(name: String): String? {
-            val path = env()["PATH"] ?: return null
-            for (dir in path.split(':')) {
-                if (dir.isBlank() || dir.startsWith("/mnt/")) continue
-                val p = "$dir/$name"
-                if (exists(p)) return p
+        /** \\wsl.localhost cannot follow absolute symlinks; ask the distro when the cheap check says no. */
+        override fun exists(targetPath: String): Boolean {
+            if (super.exists(targetPath)) return true
+            if (!targetPath.startsWith("/")) return false
+            return try {
+                CapturingProcessHandler(GeneralCommandLine("wsl.exe", "-d", distro, "--exec", "test", "-e", targetPath))
+                    .runProcess(10_000).exitCode == 0
+            } catch (e: Exception) {
+                false
             }
-            return null
         }
+
+        // Asked inside the distro: many tools are symlinks (/usr/bin/cmake ->
+        // /etc/alternatives/...), which \\wsl.localhost cannot follow from Windows.
+        override fun which(name: String): String? = WHICH_CACHE.getOrPut("$distro\u0000$name") {
+            val path = env()["PATH"]?.split(':')?.filterNot { it.startsWith("/mnt/") }?.joinToString(":")
+            val args = buildList {
+                if (path != null) { add("env"); add("PATH=$path") }
+                add("which"); add(name)
+            }
+            try {
+                val out = CapturingProcessHandler(GeneralCommandLine(listOf("wsl.exe", "-d", distro, "--exec") + args)
+                    .withCharset(StandardCharsets.UTF_8)).runProcess(10_000)
+                if (out.exitCode == 0) out.stdout.trim().lineSequence().firstOrNull().orEmpty() else ""
+            } catch (e: Exception) {
+                ""
+            }
+        }.ifEmpty { null }
 
         /** Login + interactive bash, so exports from ~/.profile and ~/.bashrc are seen. */
         private fun loadEnv(): Map<String, String> {
@@ -102,8 +121,12 @@ sealed class SpTarget {
     companion object {
         private val LOG = logger<SpTarget>()
         private val ENV_CACHE = ConcurrentHashMap<String, Map<String, String>>()
+        private val WHICH_CACHE = ConcurrentHashMap<String, String>()
 
-        /** Forget cached WSL environments (after the user changed ~/.bashrc, say). */
-        fun clearCaches() = ENV_CACHE.clear()
+        /** Forget cached WSL environments and lookups (after the user changed ~/.bashrc, say). */
+        fun clearCaches() {
+            ENV_CACHE.clear()
+            WHICH_CACHE.clear()
+        }
     }
 }

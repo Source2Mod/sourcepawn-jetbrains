@@ -67,7 +67,7 @@ class SpSaveChecker(private val project: Project) : Disposable {
             if (!project.isOpen) return
             try {
                 val result = SpCompiler.compile(toolchain, SpCompileRequest(script, out)) { _, _ -> }
-                SpCompileResults.get(project).publish(script, result)
+                SpCompileResults.get(project).publish("spcomp " + File(script).name, result)
                 File(result.smx).delete()
             } catch (e: Exception) {
                 LOG.info("spcomp on save failed for $script", e)

@@ -36,6 +36,14 @@ class SpSettingsState : BaseState() {
     /** Extra spcomp arguments, shell-style quoting. */
     var compilerArguments by string("")
 
+    /**
+     * Take spcomp and the include dirs from the spcomp commands of a CMake build
+     * dir or an AMBuild objdir. Auto finds them up to two levels under the project.
+     */
+    var buildSystem by enum(org.source2mod.sourcepawn.toolchain.BuildSystem.AUTO)
+    /** The build dir / objdir; empty = search the project. */
+    var buildDirectory by string("")
+
     /** Main plugin file (for the run configuration's "project main file"). */
     var mainFile by string("")
     /** Where .smx files go; empty = <script dir>/../plugins (or next to the script). */

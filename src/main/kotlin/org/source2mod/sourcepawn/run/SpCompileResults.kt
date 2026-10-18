@@ -21,8 +21,8 @@ import java.util.concurrent.ConcurrentHashMap
 class SpCompileResults(private val project: Project) {
     private val byScript = ConcurrentHashMap<String, List<SpMessage>>()
 
-    fun publish(script: String, result: SpCompileResult) {
-        byScript[norm(script)] = result.messages
+    fun publish(key: String, result: SpCompileResult) {
+        byScript[key] = result.messages
         ApplicationManager.getApplication().invokeLater {
             if (!project.isDisposed) DaemonCodeAnalyzer.getInstance(project).restart()
         }
@@ -30,7 +30,7 @@ class SpCompileResults(private val project: Project) {
 
     fun messagesFor(file: String): List<SpMessage> {
         val f = norm(file)
-        return byScript.values.flatMap { list -> list.filter { norm(it.hostFile) == f } }
+        return byScript.values.flatMap { list -> list.filter { norm(it.hostFile) == f } }.distinct()
     }
 
     private fun norm(p: String) = p.replace('\\', '/').lowercase()

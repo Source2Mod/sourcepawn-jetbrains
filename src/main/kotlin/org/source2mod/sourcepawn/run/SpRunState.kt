@@ -57,30 +57,33 @@ private class StepsProcessHandler(private val project: Project, private val conf
 
     private fun runSteps(): Int {
         val toolchain = config.toolchain()
-        val req = config.compileRequest(toolchain)
-        val result = SpCompiler.compile(
-            toolchain, req,
+        val plan = config.buildPlan(toolchain)
+        val result = SpCompiler.run(
+            toolchain, plan,
             onStart = { cmd, h ->
                 spcomp = h
                 sys(SpCompiler.describe(cmd) + "\n")
             },
             onLine = { line, type -> notifyTextAvailable(line, if (type == ProcessOutputTypes.STDERR) type else ProcessOutputTypes.STDOUT) },
         )
-        SpCompileResults.get(project).publish(req.script, result)
-        LocalFileSystem.getInstance().refreshAndFindFileByPath(req.outputDir)?.refresh(true, false)
+        SpCompileResults.get(project).publish(plan.title, result)
+        for (out in result.outputs) LocalFileSystem.getInstance().refreshAndFindFileByPath(File(out).parent)?.refresh(true, false)
         if (!result.success || cancelled) {
-            sys("spcomp failed (exit code ${result.exitCode})\n")
+            sys("${plan.title} failed (exit code ${result.exitCode})\n")
             return if (result.exitCode != 0) result.exitCode else 1
         }
-        sys("Compiled ${req.smx}\n")
+        sys(if (result.outputs.isEmpty()) "Built\n" else "Built ${result.outputs.joinToString(", ")}\n")
 
         val o = config.options
         if (o.copyEnabled && !cancelled) {
             val dir = toolchain.target.toHost(toolchain.userPathToTarget(o.copyToDir ?: ""))
-            val dest = File(dir, req.smxName)
-            dest.parentFile.mkdirs()
-            Files.copy(File(req.smx).toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            sys("Copied to ${dest.path}\n")
+            if (result.outputs.isEmpty()) sys("Nothing to copy: no .smx known for this build\n")
+            for (smx in result.outputs) {
+                val dest = File(dir, File(smx).name)
+                dest.parentFile.mkdirs()
+                Files.copy(File(smx).toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                sys("Copied to ${dest.path}\n")
+            }
         }
         if (o.rconEnabled && o.rconCommands.isNotEmpty() && !cancelled) {
             val host = o.rconHost ?: "127.0.0.1"
