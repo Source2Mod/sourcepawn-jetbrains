@@ -1,0 +1,69 @@
+<idea-plugin>
+    <id>org.source2mod.sourcepawn</id>
+    <name>SourcePawn</name>
+    <vendor url="https://github.com/Source2Mod">Source2Mod</vendor>
+
+    <description><![CDATA[
+    SourcePawn support for JetBrains IDEs (CLion first), built on the
+    <a href="https://github.com/Sarrus1/sourcepawn-studio">SourcePawn Studio</a> language server.
+    <ul>
+      <li><code>.sp</code> / <code>.inc</code> file types, highlighting, brace matching, commenting</li>
+      <li>Completion, hover, go to definition, find usages, rename, parameter info, semantic highlighting,
+          structure view and spcomp diagnostics through sourcepawn-studio</li>
+      <li>spcomp and include directories from settings, environment variables
+          (<code>SPCOMP</code>, <code>SOURCE2MOD_SDK</code>, ...) or PATH, with a Doctor view</li>
+      <li>A SourcePawn run configuration: Build compiles, Run compiles, copies the .smx and sends RCON commands</li>
+      <li>Projects inside WSL: spcomp and the server run in the distro, paths are translated</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <!-- The LSP API ships with the commercial IDEs (CLion, IntelliJ IDEA Ultimate, ...). -->
+    <depends>com.intellij.modules.ultimate</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType name="SourcePawn" implementationClass="org.source2mod.sourcepawn.SpFileType" fieldName="INSTANCE"
+                  language="SourcePawn" extensions="sp"/>
+        <fileType name="SourcePawn Include" implementationClass="org.source2mod.sourcepawn.SpIncludeFileType" fieldName="INSTANCE"
+                  extensions="inc"/>
+        <lang.parserDefinition language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpParserDefinition"/>
+        <lang.syntaxHighlighterFactory language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpSyntaxHighlighterFactory"/>
+        <lang.braceMatcher language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpBraceMatcher"/>
+        <lang.commenter language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpCommenter"/>
+        <lang.quoteHandler language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpQuoteHandler"/>
+        <colorSettingsPage implementation="org.source2mod.sourcepawn.lang.SpColorSettingsPage"/>
+
+        <projectConfigurable parentId="language" instance="org.source2mod.sourcepawn.settings.SpConfigurable"
+                             id="settings.sourcepawn" displayName="SourcePawn"/>
+        <notificationGroup id="SourcePawn" displayType="BALLOON"/>
+
+        <platform.lsp.serverSupportProvider implementation="org.source2mod.sourcepawn.lsp.SpLspServerSupportProvider"/>
+        <lang.psiStructureViewFactory language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lsp.SpStructureViewFactory"/>
+        <renameHandler implementation="org.source2mod.sourcepawn.lsp.SpRenameHandler"/>
+        <codeInsight.parameterInfo language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lsp.SpParameterInfoHandler"/>
+
+        <configurationType implementation="org.source2mod.sourcepawn.run.SpRunConfigurationType"/>
+        <runConfigurationProducer implementation="org.source2mod.sourcepawn.run.SpRunConfigurationProducer"/>
+        <projectTaskRunner implementation="org.source2mod.sourcepawn.run.SpProjectTaskRunner" order="first"/>
+        <externalAnnotator language="SourcePawn" implementationClass="org.source2mod.sourcepawn.run.SpCompileAnnotator"/>
+        <consoleFilterProvider implementation="org.source2mod.sourcepawn.run.SpConsoleFilterProvider"/>
+    </extensions>
+
+    <projectListeners>
+        <listener class="org.source2mod.sourcepawn.settings.SpToolchainChangeListener"
+                  topic="org.source2mod.sourcepawn.toolchain.SpToolchainService$Listener"/>
+    </projectListeners>
+
+    <applicationListeners>
+        <listener class="org.source2mod.sourcepawn.run.SpSaveListener"
+                  topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"/>
+    </applicationListeners>
+
+    <actions>
+        <action id="SourcePawn.CompileFile" class="org.source2mod.sourcepawn.run.SpCompileFileAction">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="BuildMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
