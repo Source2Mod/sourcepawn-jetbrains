@@ -29,6 +29,7 @@ object SpFileType : LanguageFileType(SpLanguage) {
 object SpIncludeFileType : LanguageFileType(SpLanguage, true) {
     const val NAME = "SourcePawn Include"
     override fun getName() = NAME
+    override fun getDisplayName() = NAME
     override fun getDescription() = "SourcePawn include"
     override fun getDefaultExtension() = "inc"
     override fun getIcon(): Icon = SpIcons.INCLUDE

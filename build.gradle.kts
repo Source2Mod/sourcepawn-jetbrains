@@ -47,3 +47,8 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
 }
+
+tasks.runIde {
+    // ./gradlew runIde -PrunIdeProject=<dir> opens that project directly
+    providers.gradleProperty("runIdeProject").orNull?.let { args(it) }
+}

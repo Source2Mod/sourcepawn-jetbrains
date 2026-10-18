@@ -60,6 +60,12 @@
     </applicationListeners>
 
     <actions>
+        <action id="SourcePawn.BuildSelected" class="org.source2mod.sourcepawn.run.SpBuildSelectedAction"
+                text="Build SourcePawn Configuration" icon="AllIcons.Actions.Compile">
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="before" relative-to-action="compositeResumeGroup"/>
+            <add-to-group group-id="BuildMenu" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control F9"/>
+        </action>
         <action id="SourcePawn.CompileFile" class="org.source2mod.sourcepawn.run.SpCompileFileAction">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>

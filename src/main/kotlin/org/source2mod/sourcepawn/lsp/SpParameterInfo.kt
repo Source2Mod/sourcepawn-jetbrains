@@ -20,23 +20,25 @@ class SpParameterInfoHandler : ParameterInfoHandler<PsiElement, SignatureInforma
         if (help.signatures.isNullOrEmpty()) return null
         context.itemsToShow = help.signatures.toTypedArray()
         active = help.activeParameter ?: 0
-        return context.file.findElementAt(context.offset) ?: context.file
+        // the PSI is flat and leaves are replaced on every keystroke, which would
+        // close the hint: the file is the one owner that stays valid
+        return context.file
     }
 
     override fun showParameterInfo(element: PsiElement, context: CreateParameterInfoContext) =
         context.showHint(element, context.offset, this)
 
-    override fun findElementForUpdatingParameterInfo(context: UpdateParameterInfoContext): PsiElement? =
-        context.file.findElementAt(context.offset) ?: context.file
+    override fun findElementForUpdatingParameterInfo(context: UpdateParameterInfoContext): PsiElement? = context.file
 
+    // runs on the EDT, where a synchronous LSP request is not possible: the active
+    // parameter is the number of top-level commas since the call's '('
     override fun updateParameterInfo(parameterOwner: PsiElement, context: UpdateParameterInfoContext) {
-        val help = request(context.file, context.editor.document, context.offset)
-        if (help == null || help.signatures.isNullOrEmpty()) {
+        val index = argumentIndex(context.editor.document.charsSequence, context.offset)
+        if (index < 0) {
             context.removeHint()
             return
         }
-        active = help.activeParameter ?: help.signatures.getOrNull(help.activeSignature ?: 0)?.activeParameter ?: 0
-        context.setCurrentParameter(active)
+        context.setCurrentParameter(index)
     }
 
     override fun updateUI(p: SignatureInformation, context: ParameterInfoUIContext) {
@@ -55,6 +57,31 @@ class SpParameterInfoHandler : ParameterInfoHandler<PsiElement, SignatureInforma
             }
         }
         context.setupUIComponentPresentation(label, start, end, false, false, false, context.defaultParameterColor)
+    }
+
+    /** Index of the argument at [offset], or -1 when [offset] is not inside a call's parentheses. */
+    internal fun argumentIndex(text: CharSequence, offset: Int): Int {
+        var depth = 0
+        var commas = 0
+        var i = minOf(offset, text.length) - 1
+        while (i >= 0) {
+            when (val c = text[i]) {
+                ')', ']', '}' -> depth++
+                '(', '[', '{' -> {
+                    if (depth == 0) return if (c == '(') commas else -1
+                    depth--
+                }
+                ',' -> if (depth == 0) commas++
+                ';' -> return -1
+                '"', '\'' -> {
+                    // skip back over a string or char literal
+                    i--
+                    while (i >= 0 && !(text[i] == c && (i == 0 || text[i - 1] != '\\'))) i--
+                }
+            }
+            i--
+        }
+        return -1
     }
 
     private fun request(file: PsiFile, document: Document, offset: Int): SignatureHelp? {

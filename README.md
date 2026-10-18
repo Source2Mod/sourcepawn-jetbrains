@@ -14,7 +14,7 @@ plain SourceMod plugins too.
 | spcomp | from settings → `$SPCOMP` → `$SOURCE2MOD_DIR/scripting` / `$SOURCEMOD_DIR/scripting` → `PATH` |
 | Includes | settings list (`$VAR$`, `${VAR}`, `$PROJECT_DIR$`, project-relative) + `$SOURCEPAWN_INCLUDE` + `$SOURCE2MOD_SDK/public/scripting` + the `include` dir next to spcomp |
 | Doctor | Settings → Languages & Frameworks → SourcePawn → *Resolve* shows every resolved path and where it came from |
-| Run configuration | "SourcePawn" type in the toolbar selector. **Build** (hammer / Ctrl+F9 while it is selected) compiles into the Build tool window with clickable errors; **Run** compiles, then optionally copies the `.smx` to a server's plugins dir and sends RCON commands (e.g. `s2m reload`) |
+| Run configuration | "SourcePawn" type in the toolbar selector. **Build** (the hammer next to the selector / Ctrl+F9 while it is selected; CLion's own hammer only knows CMake-style targets) compiles into the Build tool window with clickable errors; **Run** compiles, then optionally copies the `.smx` to a server's plugins dir and sends RCON commands (e.g. `s2m reload`) |
 | Editor checks | spcomp on save; its errors and warnings show in the editor until the next compile |
 | WSL | projects under `\\wsl.localhost\<distro>\...` run spcomp and the server inside the distro (`wsl.exe --exec`); paths and URIs are translated both ways |
 
@@ -70,7 +70,9 @@ so exports in `~/.profile` or `~/.bashrc` count.
 ```
 
 Set `platformLocalPath` (in `~/.gradle/gradle.properties`) to an installed
-CLion to skip downloading one. `./gradlew test` runs unit tests plus an end-to-end
+CLion to skip downloading one; `-PrunIdeProject=<dir>` opens a project
+directly (`//wsl.localhost/<distro>/...` works, a `\` path loses a backslash
+on the way and opens LightEdit instead). `./gradlew test` runs unit tests plus an end-to-end
 test against a WSL distro (`-Dsp.test.distro`, `-Dsp.test.spcomp`); it skips
 itself when that setup is missing.
 

@@ -50,3 +50,17 @@ class SpLexerTest {
         assertEquals(listOf(T.STRING to "\"abc"), lex("\"abc"))
     }
 }
+
+class SpParameterIndexTest {
+    private val h = org.source2mod.sourcepawn.lsp.SpParameterInfoHandler()
+    private fun idx(s: String) = h.argumentIndex(s.replace("|", ""), s.indexOf('|'))
+
+    @Test fun indexes() {
+        assertEquals(0, idx("Foo(|"))
+        assertEquals(1, idx("Foo(\"a, b\", |)"))
+        assertEquals(3, idx("Foo(a, Bar(1, 2), x[1], |"))
+        assertEquals(1, idx("Foo(',', |"))
+        assertEquals(-1, idx("Foo(a); |"))
+        assertEquals(-1, idx("x = {1, |"))
+    }
+}
