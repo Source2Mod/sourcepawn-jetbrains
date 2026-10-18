@@ -146,12 +146,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: plugin-distribution
-          path: ./release
+          path: ./release/files
 
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.version.outputs.tag }}
-          files: release/sourcepawn-jetbrains-*.zip
+          files: release/files/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
