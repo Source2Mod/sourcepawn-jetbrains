@@ -121,7 +121,17 @@ jobs:
           cache: gradle
 
       - name: Build plugin
-        run: ./gradlew buildPlugin
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Release builds take their version from the tag (v1.2.3 -> 1.2.3),
+          # plain builds keep pluginVersion from gradle.properties
+          if [ -n "$TAG" ]; then
+            ./gradlew buildPlugin -PpluginVersion="${TAG#v}"
+          else
+            ./gradlew buildPlugin
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
