@@ -1,1 +1,2 @@
 Trigger file for builds. Modify this file and push to trigger a new release.
+Release: replace internal Build window event classes (Marketplace internal API rejection on 2026.2)
