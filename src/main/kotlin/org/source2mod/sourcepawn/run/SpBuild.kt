@@ -2,13 +2,8 @@ package org.source2mod.sourcepawn.run
 
 import com.intellij.build.BuildViewManager
 import com.intellij.build.DefaultBuildDescriptor
-import com.intellij.build.FilePosition
 import com.intellij.build.events.MessageEvent
 import com.intellij.build.events.impl.FailureResultImpl
-import com.intellij.build.events.impl.FileMessageEventImpl
-import com.intellij.build.events.impl.FinishBuildEventImpl
-import com.intellij.build.events.impl.OutputBuildEventImpl
-import com.intellij.build.events.impl.StartBuildEventImpl
 import com.intellij.build.events.impl.SuccessResultImpl
 import com.intellij.execution.RunManager
 import com.intellij.execution.process.ProcessOutputTypes
@@ -52,29 +47,28 @@ object SpBuild {
                     val (toolchain, plan) = prepare()
                     val descriptor = DefaultBuildDescriptor(id, "SourcePawn: ${plan.title}", plan.workDir ?: project.basePath ?: ".", start)
                         .withExecutionFilter(SpOutputFilter(project))
-                    view.onEvent(id, StartBuildEventImpl(descriptor, plan.title))
+                    view.onEvent(id, SpBuildEvents.start(descriptor, plan.title))
                     showBuildWindow(project)
                     val result = SpCompiler.run(
                         toolchain, plan,
-                        onStart = { cmd, _ -> view.onEvent(id, OutputBuildEventImpl(id, SpCompiler.describe(cmd) + "\n", true)) },
-                        onLine = { line, type -> view.onEvent(id, OutputBuildEventImpl(id, line, type != ProcessOutputTypes.STDERR)) },
+                        onStart = { cmd, _ -> view.onEvent(id, SpBuildEvents.output(id, SpCompiler.describe(cmd) + "\n", true)) },
+                        onLine = { line, type -> view.onEvent(id, SpBuildEvents.output(id, line, type != ProcessOutputTypes.STDERR)) },
                     )
                     for (m in result.messages) {
                         val kind = if (m.severity == SpMessage.Severity.ERROR) MessageEvent.Kind.ERROR else MessageEvent.Kind.WARNING
-                        view.onEvent(id, FileMessageEventImpl(id, kind, "spcomp", "${m.code}: ${m.text}", null,
-                            FilePosition(File(m.hostFile), m.line - 1, 0)))
+                        view.onEvent(id, SpBuildEvents.fileMessage(id, kind, "spcomp", "${m.code}: ${m.text}", File(m.hostFile), m.line - 1))
                     }
                     SpCompileResults.get(project).publish(plan.title, result)
                     for (out in result.outputs) LocalFileSystem.getInstance().refreshAndFindFileByPath(File(out).parent)?.refresh(true, false)
                     ok = result.success
-                    view.onEvent(id, FinishBuildEventImpl(id, null, System.currentTimeMillis(),
+                    view.onEvent(id, SpBuildEvents.finish(id,
                         if (!ok) "${plan.title} failed" else if (result.outputs.isEmpty()) "Built" else "Built ${result.outputs.joinToString(", ")}",
                         if (ok) SuccessResultImpl() else FailureResultImpl()))
                 } catch (e: Exception) {
                     val descriptor = DefaultBuildDescriptor(id, "SourcePawn", project.basePath ?: ".", start)
-                    view.onEvent(id, StartBuildEventImpl(descriptor, title))
-                    view.onEvent(id, OutputBuildEventImpl(id, (e.message ?: e.toString()) + "\n", false))
-                    view.onEvent(id, FinishBuildEventImpl(id, null, System.currentTimeMillis(), e.message ?: "failed", FailureResultImpl(e)))
+                    view.onEvent(id, SpBuildEvents.start(descriptor, title))
+                    view.onEvent(id, SpBuildEvents.output(id, (e.message ?: e.toString()) + "\n", false))
+                    view.onEvent(id, SpBuildEvents.finish(id, e.message ?: "failed", FailureResultImpl(e)))
                 } finally {
                     done(ok)
                 }

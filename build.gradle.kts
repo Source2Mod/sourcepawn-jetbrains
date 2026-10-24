@@ -46,6 +46,30 @@ intellijPlatform {
     }
     buildSearchableOptions = false
     instrumentCode = false
+
+    // ./gradlew verifyPlugin: same checks the Marketplace runs on upload.
+    // -PverifyIdes=CL:2025.2.4,IU:2025.2.4 picks other IDEs, the default is the platform the plugin builds against.
+    pluginVerification {
+        ides {
+            val list = providers.gradleProperty("verifyIdes").orNull
+            if (list.isNullOrBlank()) {
+                val local = providers.gradleProperty("platformLocalPath").orNull
+                if (!local.isNullOrBlank()) {
+                    local(local)
+                } else {
+                    ide(
+                        IntelliJPlatformType.fromCode(providers.gradleProperty("platformType").get()),
+                        providers.gradleProperty("platformVersion").get(),
+                    )
+                }
+            } else {
+                list.split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach {
+                    val (type, ver) = it.split(':', limit = 2)
+                    ide(IntelliJPlatformType.fromCode(type), ver)
+                }
+            }
+        }
+    }
 }
 
 tasks.runIde {
