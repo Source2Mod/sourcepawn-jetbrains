@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel
 
 plugins {
     id("java")
@@ -7,7 +8,11 @@ plugins {
 }
 
 group = providers.gradleProperty("pluginGroup").get()
-version = providers.gradleProperty("pluginVersion").get()
+// CI on a vX.Y.Z tag builds X.Y.Z, everything else uses pluginVersion (gradle.properties or -PpluginVersion=...)
+version = providers.environmentVariable("GITHUB_REF_NAME").orNull
+    ?.takeIf { Regex("""v\d+\.\d+\.\d+""").matches(it) }
+    ?.removePrefix("v")
+    ?: providers.gradleProperty("pluginVersion").get()
 
 kotlin {
     jvmToolchain(21)
@@ -39,6 +44,7 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
+        version = project.version.toString()
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = provider { null }
@@ -47,21 +53,16 @@ intellijPlatform {
     buildSearchableOptions = false
     instrumentCode = false
 
-    // ./gradlew verifyPlugin: same checks the Marketplace runs on upload.
-    // -PverifyIdes=CL:2025.2.4,IU:2025.2.4 picks other IDEs, the default is the platform the plugin builds against.
+    // ./gradlew verifyPlugin: same checks the Marketplace runs on upload, and it fails the build on
+    // compatibility problems or internal API usages so CI stops before publishPlugin.
+    // Default IDEs: recommended() (the releases matching since/until build).
+    // -PverifyIdes=CL:2025.2.4,IU:2025.2.4 picks other IDEs instead.
     pluginVerification {
+        failureLevel = listOf(FailureLevel.COMPATIBILITY_PROBLEMS, FailureLevel.INTERNAL_API_USAGES)
         ides {
             val list = providers.gradleProperty("verifyIdes").orNull
             if (list.isNullOrBlank()) {
-                val local = providers.gradleProperty("platformLocalPath").orNull
-                if (!local.isNullOrBlank()) {
-                    local(local)
-                } else {
-                    ide(
-                        IntelliJPlatformType.fromCode(providers.gradleProperty("platformType").get()),
-                        providers.gradleProperty("platformVersion").get(),
-                    )
-                }
+                recommended()
             } else {
                 list.split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach {
                     val (type, ver) = it.split(':', limit = 2)
@@ -69,6 +70,10 @@ intellijPlatform {
                 }
             }
         }
+    }
+
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
     }
 }
 

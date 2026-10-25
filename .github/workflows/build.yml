@@ -118,19 +118,24 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Build plugin
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build, verify and publish plugin
         env:
           TAG: ${{ needs.version.outputs.tag }}
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
         run: |
           set -euo pipefail
-          # Release builds take their version from the tag (v1.2.3 -> 1.2.3),
-          # plain builds keep pluginVersion from gradle.properties
+          # Release builds take their version from the tag (v1.2.3 -> 1.2.3; on a tag push
+          # build.gradle.kts reads GITHUB_REF_NAME, a pushbuild.txt run passes the new tag),
+          # plain builds keep pluginVersion from gradle.properties.
+          # verifyPlugin fails on compatibility problems / internal API, so nothing broken gets published.
           if [ -n "$TAG" ]; then
-            ./gradlew buildPlugin -PpluginVersion="${TAG#v}"
+            ./gradlew buildPlugin verifyPlugin publishPlugin -PpluginVersion="${TAG#v}"
           else
-            ./gradlew buildPlugin
+            ./gradlew buildPlugin verifyPlugin
           fi
 
       - name: Upload artifact
