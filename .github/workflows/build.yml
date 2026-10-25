@@ -130,11 +130,18 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # the verified IDEs are several GB each, far over the Actions cache limit
+          cache-disabled: true
 
       - name: Build, verify and publish plugin
         env:
           TAG: ${{ needs.version.outputs.tag }}
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+          # recommended() pulls every CLion major since 243 and runs the runner out of disk:
+          # oldest supported (= build platform, downloaded once), a middle one and the newest release.
+          # Bump the last entry when a new CLion major ships.
+          VERIFY_IDES: CL:2024.3.2,CL:2025.2.4,CL:2026.2.4
         run: |
           set -euo pipefail
           # Release builds take their version from the tag (v1.2.3 -> 1.2.3; on a tag push
@@ -142,10 +149,11 @@ jobs:
           # plain builds keep pluginVersion from gradle.properties.
           # verifyPlugin fails on compatibility problems / internal API, so nothing broken gets published.
           if [ -n "$TAG" ]; then
-            ./gradlew buildPlugin verifyPlugin publishPlugin -PpluginVersion="${TAG#v}"
+            ./gradlew buildPlugin verifyPlugin publishPlugin -PverifyIdes="$VERIFY_IDES" -PpluginVersion="${TAG#v}"
           else
-            ./gradlew buildPlugin verifyPlugin
+            ./gradlew buildPlugin verifyPlugin -PverifyIdes="$VERIFY_IDES"
           fi
+          df -h /
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
