@@ -77,6 +77,11 @@ intellijPlatform {
     }
 }
 
+// Never upload a build the verifier rejected (without this, Gradle runs both in parallel)
+tasks.publishPlugin {
+    dependsOn(tasks.verifyPlugin)
+}
+
 tasks.runIde {
     // ./gradlew runIde -PrunIdeProject=<dir> opens that project directly
     providers.gradleProperty("runIdeProject").orNull?.let { args(it) }
