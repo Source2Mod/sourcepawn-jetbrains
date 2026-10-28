@@ -19,6 +19,7 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.rows
 import com.intellij.ui.dsl.builder.toNullableProperty
 import org.source2mod.sourcepawn.SpFileType
+import org.source2mod.sourcepawn.index.SpIncludeLibraryProvider
 import org.source2mod.sourcepawn.lsp.SpLspServerSupportProvider
 import org.source2mod.sourcepawn.run.SpSaveChecker
 import org.source2mod.sourcepawn.toolchain.SpToolchain
@@ -211,6 +212,7 @@ class SpToolchainChangeListener(private val project: Project) : SpToolchainServi
     override fun toolchainChanged() {
         SpLspServerSupportProvider.forgetNotification(project)
         SpLspServerSupportProvider.restart(project)
+        SpIncludeLibraryProvider.refresh(project)
         // recheck what is open: a newly set spcomp / include dir shows up without a save
         val open = FileEditorManager.getInstance(project).openFiles.filter { it.fileType == SpFileType }.map { it.path }
         if (open.isNotEmpty()) SpSaveChecker.get(project).schedule(open)

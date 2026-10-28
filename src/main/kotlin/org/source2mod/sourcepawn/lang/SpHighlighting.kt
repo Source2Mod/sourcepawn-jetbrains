@@ -41,15 +41,31 @@ object SpColors {
     val DOT = createTextAttributesKey("SP_DOT", D.DOT)
     val OPERATOR = createTextAttributesKey("SP_OPERATOR", D.OPERATION_SIGN)
     val IDENTIFIER = createTextAttributesKey("SP_IDENTIFIER", D.IDENTIFIER)
+
+    // From the language server's semantic tokens and SpAnnotator
+    val FUNCTION_DECLARATION = createTextAttributesKey("SP_FUNCTION_DECLARATION", D.FUNCTION_DECLARATION)
+    // Calls are colored like declarations (as CLion does for C++); FUNCTION_CALL and
+    // CLASS_REFERENCE are plain text in Dark / Darcula. TYPE_NAME gets its own color
+    // per scheme from colorSchemes/SourcePawn*.xml.
+    val FUNCTION_CALL = createTextAttributesKey("SP_FUNCTION_CALL", D.FUNCTION_DECLARATION)
+    val METHOD_CALL = createTextAttributesKey("SP_METHOD_CALL", D.INSTANCE_METHOD)
+    val MACRO = createTextAttributesKey("SP_MACRO", D.METADATA)
+    val TYPE_NAME = createTextAttributesKey("SP_TYPE_NAME", D.CLASS_NAME)
+    val FIELD = createTextAttributesKey("SP_FIELD", D.INSTANCE_FIELD)
+    val ENUM_MEMBER = createTextAttributesKey("SP_ENUM_MEMBER", D.STATIC_FIELD)
+    val GLOBAL_VARIABLE = createTextAttributesKey("SP_GLOBAL_VARIABLE", D.GLOBAL_VARIABLE)
+    val LOCAL_VARIABLE = createTextAttributesKey("SP_LOCAL_VARIABLE", D.LOCAL_VARIABLE)
+    val PARAMETER = createTextAttributesKey("SP_PARAMETER", D.PARAMETER)
 }
 
 class SpSyntaxHighlighter : SyntaxHighlighterBase() {
-    override fun getHighlightingLexer() = SpLexer()
+    override fun getHighlightingLexer() = SpHighlightingLexer()
 
     override fun getTokenHighlights(type: IElementType?): Array<TextAttributesKey> = pack(MAP[type])
 
     companion object {
-        private val MAP: Map<IElementType, TextAttributesKey> = mapOf(
+        private val MAP: Map<IElementType, TextAttributesKey> =
+            SpIdentifierColors.TOKENS.entries.associate { (key, type) -> type to key } + mapOf(
             T.KEYWORD to SpColors.KEYWORD,
             T.TYPE_KEYWORD to SpColors.TYPE,
             T.CONSTANT_KEYWORD to SpColors.CONSTANT,
@@ -134,6 +150,16 @@ class SpColorSettingsPage : ColorSettingsPage {
         AttributesDescriptor("Braces and Operators//Dot", SpColors.DOT),
         AttributesDescriptor("Braces and Operators//Operator", SpColors.OPERATOR),
         AttributesDescriptor("Identifier", SpColors.IDENTIFIER),
+        AttributesDescriptor("Functions//Function declaration", SpColors.FUNCTION_DECLARATION),
+        AttributesDescriptor("Functions//Function call", SpColors.FUNCTION_CALL),
+        AttributesDescriptor("Functions//Method call", SpColors.METHOD_CALL),
+        AttributesDescriptor("Macro / constant name", SpColors.MACRO),
+        AttributesDescriptor("Type (methodmap, enum, enum struct)", SpColors.TYPE_NAME),
+        AttributesDescriptor("Property / field", SpColors.FIELD),
+        AttributesDescriptor("Enum member", SpColors.ENUM_MEMBER),
+        AttributesDescriptor("Variables//Global variable", SpColors.GLOBAL_VARIABLE),
+        AttributesDescriptor("Variables//Local variable", SpColors.LOCAL_VARIABLE),
+        AttributesDescriptor("Variables//Parameter", SpColors.PARAMETER),
     )
 
     override fun getDemoText() = """

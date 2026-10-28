@@ -32,6 +32,11 @@
         <lang.commenter language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpCommenter"/>
         <lang.quoteHandler language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpQuoteHandler"/>
         <colorSettingsPage implementation="org.source2mod.sourcepawn.lang.SpColorSettingsPage"/>
+        <annotator language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lang.SpAnnotator"/>
+        <additionalTextAttributes scheme="Darcula" file="colorSchemes/SourcePawnDark.xml"/>
+        <additionalTextAttributes scheme="Dark" file="colorSchemes/SourcePawnDark.xml"/>
+        <additionalTextAttributes scheme="Default" file="colorSchemes/SourcePawnLight.xml"/>
+        <additionalTextAttributes scheme="Light" file="colorSchemes/SourcePawnLight.xml"/>
 
         <projectConfigurable parentId="language" instance="org.source2mod.sourcepawn.settings.SpConfigurable"
                              id="settings.sourcepawn" displayName="SourcePawn"/>
@@ -40,6 +45,12 @@
         <platform.lsp.serverSupportProvider implementation="org.source2mod.sourcepawn.lsp.SpLspServerSupportProvider"/>
         <lang.psiStructureViewFactory language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lsp.SpStructureViewFactory"/>
         <renameHandler implementation="org.source2mod.sourcepawn.lsp.SpRenameHandler"/>
+        <gotoDeclarationHandler implementation="org.source2mod.sourcepawn.lsp.SpGotoDeclarationHandler"/>
+
+        <fileBasedIndex implementation="org.source2mod.sourcepawn.index.SpSymbolIndex"/>
+        <additionalLibraryRootsProvider implementation="org.source2mod.sourcepawn.index.SpIncludeLibraryProvider"/>
+        <gotoClassContributor implementation="org.source2mod.sourcepawn.index.SpGotoClassContributor"/>
+        <gotoSymbolContributor implementation="org.source2mod.sourcepawn.index.SpGotoSymbolContributor"/>
         <codeInsight.parameterInfo language="SourcePawn" implementationClass="org.source2mod.sourcepawn.lsp.SpParameterInfoHandler"/>
 
         <configurationType implementation="org.source2mod.sourcepawn.run.SpRunConfigurationType"/>

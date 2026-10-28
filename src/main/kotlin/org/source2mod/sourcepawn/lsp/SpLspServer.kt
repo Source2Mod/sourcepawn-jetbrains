@@ -11,8 +11,13 @@ import com.intellij.platform.lsp.api.LspServer
 import com.intellij.platform.lsp.api.LspServerManager
 import com.intellij.platform.lsp.api.LspServerSupportProvider
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.lsp.api.customization.LspSemanticTokensSupport
+import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.psi.PsiFile
 import org.eclipse.lsp4j.ConfigurationItem
+import org.source2mod.sourcepawn.SpLanguage
 import org.source2mod.sourcepawn.isSourcePawn
+import org.source2mod.sourcepawn.lang.SpColors
 import org.source2mod.sourcepawn.settings.SpConfigurable
 import org.source2mod.sourcepawn.toolchain.SpTarget
 import org.source2mod.sourcepawn.toolchain.SpToolchain
@@ -93,6 +98,26 @@ class SpLspServerDescriptor(
         if (target !is SpTarget.Wsl) return super.findFileByUri(fileUri)
         val host = WslPaths.uriToHostPath(fileUri, target.distro) ?: return null
         return findLocalFileByPath(host)
+    }
+
+    // The platform only asks for semantic tokens in TEXT / TextMate files by default
+    override val lspSemanticTokensSupport = object : LspSemanticTokensSupport() {
+        override fun shouldAskServerForSemanticTokens(psiFile: PsiFile) = psiFile.language == SpLanguage
+
+        override fun getTextAttributesKey(tokenType: String, modifiers: List<String>): TextAttributesKey? = when (tokenType) {
+            "function" -> if ("declaration" in modifiers) SpColors.FUNCTION_DECLARATION else SpColors.FUNCTION_CALL
+            "method" -> if ("declaration" in modifiers) SpColors.FUNCTION_DECLARATION else SpColors.METHOD_CALL
+            "macro" -> SpColors.MACRO
+            "type", "class", "enum", "interface", "struct", "typeParameter" -> SpColors.TYPE_NAME
+            "property" -> SpColors.FIELD
+            "enumMember" -> SpColors.ENUM_MEMBER
+            // the server sends globals and locals alike, without modifiers: SpAnnotator decides (g_ prefix)
+            "variable" -> if ("static" in modifiers) SpColors.GLOBAL_VARIABLE else null
+            "parameter" -> SpColors.PARAMETER
+            "boolean" -> SpColors.CONSTANT
+            // comments, strings, numbers, keywords: the lexer has them already
+            else -> null
+        }
     }
 
     override fun createInitializationOptions(): Any = serverConfig()
