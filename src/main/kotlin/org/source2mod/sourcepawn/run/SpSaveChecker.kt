@@ -8,9 +8,11 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileDocumentManagerListener
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.source2mod.sourcepawn.SpFileType
 import org.source2mod.sourcepawn.isSourcePawn
@@ -36,6 +38,20 @@ class SpSaveListener : FileDocumentManagerListener {
             else FileEditorManager.getInstance(project).openFiles.filter { it.fileType == SpFileType }.map { it.path }
             if (scripts.isNotEmpty()) SpSaveChecker.get(project).schedule(scripts)
         }
+    }
+}
+
+/**
+ * Same check when a .sp is opened (restored editors included), so a file shows its
+ * errors without being edited first. An opened .inc rechecks the open .sp files.
+ * Does nothing until spcomp is found (settings, environment or PATH).
+ */
+class SpOpenListener(private val project: Project) : FileEditorManagerListener {
+    override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+        if (!file.isSourcePawn()) return
+        val scripts = if (file.fileType == SpFileType) listOf(file.path)
+        else source.openFiles.filter { it.fileType == SpFileType }.map { it.path }
+        if (scripts.isNotEmpty()) SpSaveChecker.get(project).schedule(scripts)
     }
 }
 

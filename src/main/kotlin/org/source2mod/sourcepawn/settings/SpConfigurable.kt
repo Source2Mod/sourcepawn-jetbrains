@@ -3,6 +3,7 @@ package org.source2mod.sourcepawn.settings
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
@@ -17,7 +18,9 @@ import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.rows
 import com.intellij.ui.dsl.builder.toNullableProperty
+import org.source2mod.sourcepawn.SpFileType
 import org.source2mod.sourcepawn.lsp.SpLspServerSupportProvider
+import org.source2mod.sourcepawn.run.SpSaveChecker
 import org.source2mod.sourcepawn.toolchain.SpToolchain
 import org.source2mod.sourcepawn.toolchain.SpToolchainService
 import javax.swing.JButton
@@ -208,5 +211,8 @@ class SpToolchainChangeListener(private val project: Project) : SpToolchainServi
     override fun toolchainChanged() {
         SpLspServerSupportProvider.forgetNotification(project)
         SpLspServerSupportProvider.restart(project)
+        // recheck what is open: a newly set spcomp / include dir shows up without a save
+        val open = FileEditorManager.getInstance(project).openFiles.filter { it.fileType == SpFileType }.map { it.path }
+        if (open.isNotEmpty()) SpSaveChecker.get(project).schedule(open)
     }
 }

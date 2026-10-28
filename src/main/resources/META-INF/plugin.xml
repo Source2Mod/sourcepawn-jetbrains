@@ -52,6 +52,8 @@
     <projectListeners>
         <listener class="org.source2mod.sourcepawn.settings.SpToolchainChangeListener"
                   topic="org.source2mod.sourcepawn.toolchain.SpToolchainService$Listener"/>
+        <listener class="org.source2mod.sourcepawn.run.SpOpenListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>
 
     <applicationListeners>
